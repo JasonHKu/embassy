@@ -171,26 +171,34 @@ pub(super) unsafe fn erase_sector_with_critical_section(sector: &FlashSector) ->
     critical_section::with(|_| erase_sector_unlocked(sector))
 }
 
+// TODO: Change this so that correct bank and index are returned
 pub(super) fn get_sector(address: u32, regions: &[&FlashRegion]) -> FlashSector {
     let mut current_bank = FlashBank::Bank1;
     let mut bank_offset = 0;
     for region in regions {
-        if region.bank != current_bank {
-            current_bank = region.bank;
-            bank_offset = 0;
-        }
+        // if region.bank != current_bank {
+        //     current_bank = region.bank;
+        //     bank_offset = 0;
+        // }
 
         if address >= region.base && address < region.end() {
-            let index_in_region = (address - region.base) / region.erase_size;
+            let mut index_in_region = (address - region.base) / region.erase_size;
+            let mut bank = FlashBank::Bank1;
+
+            if (address >= 0x0802_0000) {
+                index_in_region =  ((address - region.base) / region.erase_size);
+                bank = FlashBank::Bank2;
+                bank_offset = 192;
+            }
             return FlashSector {
-                bank: region.bank,
-                index_in_bank: bank_offset + index_in_region as u8,
+                bank,
+                index_in_bank: bank_offset + index_in_region,
                 start: region.base + index_in_region * region.erase_size,
                 size: region.erase_size,
             };
         }
 
-        bank_offset += region.sectors();
+        // bank_offset += region.sectors();
     }
 
     panic!("Flash sector not found");
